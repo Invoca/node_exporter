@@ -44,10 +44,12 @@ func (c *awsmetadataCollector) getAwsScheduledEvents() (map[string]string, error
 	return nil, nil
 }
 
+// takes an array of json objects in string format and returns populated structs
 func parseAwsScheduledEvents(data string) ([]sheduled_event, error) {
 	return nil, nil
 }
 
+// returns metrics in the order {active, notbefore, notafter}
 func parseAwsScheduledEventMetrics(event sheduled_event) ([3]int, error) {
 /*	if event.State == "active" {
 		

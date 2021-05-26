@@ -46,15 +46,12 @@ func TestAwsMetadata(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// event state 0/1
 		if eventMetrics[0] != wantmetrics["state"] {
 			t.Fatalf("want metric state %d, got %d", wantmetrics["state"], eventMetrics[0])
 		}
-		// event notbefore epoch time
 		if eventMetrics[1] != wantmetrics["notbefore"] {
 			t.Fatalf("want metric notbefore %d, got %d", wantmetrics["notbefore"], eventMetrics[0])
 		}
-		// event notafter epoch time
 		if eventMetrics[2] != wantmetrics["notafter"] {
 			t.Fatalf("want metric notafter %d, got %d", wantmetrics["notafter"], eventMetrics[0])
 		}
