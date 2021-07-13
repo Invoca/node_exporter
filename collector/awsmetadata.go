@@ -1,8 +1,10 @@
 package collector
 
 import (
-	"time"
 	"encoding/json"
+	"io/ioutil"
+	"net/http"
+	"time"
 	
 	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
@@ -40,8 +42,22 @@ func (c *awsmetadataCollector) getAwsMetadata() (map[string]string, error) {
 	return nil, nil
 }
 
-func (c *awsmetadataCollector) getAwsScheduledEvents() (map[string]string, error) {
-	return nil, nil
+// get scheduled events via instance metadata
+func (c *awsmetadataCollector) getAwsScheduledEvents() (string, error) {
+	mdURL := "http://169.254.169.254/latest/meta-data/events/maintenance/scheduled"
+
+	resp, e := http.Get(mdURL)
+	if e != nil {
+		return "", e
+	}
+	defer resp.Body.Close()
+
+	body, e := ioutil.ReadAll(resp.Body)
+	if e != nil {
+		return "", e
+	}
+
+	return string(body), nil
 }
 
 // takes an array of json objects in string format and returns populated structs
