@@ -7,6 +7,7 @@ require (
 	github.com/go-kit/kit v0.10.0
 	github.com/go-kit/log v0.1.0
 	github.com/godbus/dbus v0.0.0-20190402143921-271e53dc4968
+	github.com/golang/protobuf v1.4.3
 	github.com/hodgesds/perf-utils v0.2.5
 	github.com/jsimonetti/rtnetlink v0.0.0-20210122163228-8d122574c736
 	github.com/lufia/iostat v1.1.0

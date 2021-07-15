@@ -2,11 +2,13 @@ package collector
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
-	
+
 	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -33,31 +35,58 @@ func newAwsmetdataCollector(logger log.Logger) (Collector, error) {
 }
 
 func (c *awsmetadataCollector) Update(ch chan<- prometheus.Metric) error {
-	// md_metrics, err := c.getAwsMetadata()
+	metrics, err := c.getAwsMetadata()
+	if err != nil {
+		return fmt.Errorf("couldn't get scheduled events from instance metadata: %w", err)
+	}
+
+	for i, metric := range metrics {
+
+	}
 
 	return nil
 }
 
-func (c *awsmetadataCollector) getAwsMetadata() (map[string]string, error) {
-	return nil, nil
+func (c *awsmetadataCollector) getAwsMetadata() ([][3]int, error) {
+	metrics := [][3]int{}
+	eventsMetadata, err := c.getAwsScheduledEvents()
+	if err != nil {
+		return nil, err
+	}
+
+	events, err := parseAwsScheduledEvents(eventsMetadata)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, event := range events {
+		eventMetrics, err := parseAwsScheduledEventMetrics(event)
+		if err != nil {
+			return nil, err
+		}
+
+		metrics = append(metrics, eventMetrics)
+	}
+
+	return metrics, nil
 }
 
 // get scheduled events via instance metadata
 func (c *awsmetadataCollector) getAwsScheduledEvents() (string, error) {
 	mdURL := "http://169.254.169.254/latest/meta-data/events/maintenance/scheduled"
 
-	resp, e := http.Get(mdURL)
-	if e != nil {
-		return "", e
+	resp, err := http.Get(mdURL)
+	if err != nil {
+		return "", err
 	}
 	defer resp.Body.Close()
 
-	body, e := ioutil.ReadAll(resp.Body)
-	if e != nil {
-		return "", e
+	mdEvents, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
 	}
 
-	return string(body), nil
+	return string(mdEvents), nil
 }
 
 // takes an array of json objects in string format and returns populated structs
@@ -79,13 +108,13 @@ func parseAwsScheduledEventMetrics(event scheduledEvent) ([3]int, error) {
 		metrics[0] = 0
 	}
 
-	nb, e := time.Parse(tformat, event.NotBefore)
-	if e != nil {
-		return [3]int{0, 0, 0}, e
+	nb, err := time.Parse(tformat, event.NotBefore)
+	if err != nil {
+		return [3]int{0, 0, 0}, err
 	}
-	na, e := time.Parse(tformat, event.NotAfter)
-	if e != nil {
-		return [3]int{0, 0, 0}, e
+	na, err := time.Parse(tformat, event.NotAfter)
+	if err != nil {
+		return [3]int{0, 0, 0}, err
 	}
 
 	metrics[1] = int(nb.Unix())
