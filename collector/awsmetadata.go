@@ -41,7 +41,7 @@ func (c *awsmetadataCollector) Update(ch chan<- prometheus.Metric) error {
 	}
 
 	for i, metric := range metrics {
-
+		// TODO: start here -- need to setup metric Descs and push to channel
 	}
 
 	return nil
