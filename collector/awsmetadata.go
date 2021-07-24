@@ -12,6 +12,20 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+var awsmetadataDesc = prometheus.NewDesc(
+	prometheus.BuildFQName(namespace, "awsmetadata", "info"),
+	"Labeled AWS instance metadata information provided by local http request.",
+	[]string{
+		"code",
+		"state",
+		"description",
+		"eventid",
+		"notbefore",
+		"notafter",
+	},
+	nil,
+)
+
 type scheduledEvent struct {
   Code         string  `json:"code"`
   State        string  `json:"state"`
@@ -29,7 +43,7 @@ func init() {
 	registerCollector("awsmetadata", defaultEnabled, newAwsmetdataCollector)
 }
 
-// NewUnameCollector returns new unameCollector.
+// NewAwsmetadataCollector returns new Collector exposing AWS instance metadata stats
 func newAwsmetdataCollector(logger log.Logger) (Collector, error) {
 	return &unameCollector{logger}, nil
 }
@@ -42,11 +56,19 @@ func (c *awsmetadataCollector) Update(ch chan<- prometheus.Metric) error {
 
 	for i, metric := range metrics {
 		// TODO: start here -- need to setup metric Descs and push to channel
+		ch <- prometheus.MustNewConstMetric(awsmetadataDesc, prometheus.GaugeValue, 1,
+			metric[0],
+			metric[1],
+			metric[2],
+		)
 	}
 
 	return nil
 }
 
+// TODO: should i generalize this more?
+// TODO: compare to https://github.com/aws/aws-node-termination-handler/blob/8eceda9337/pkg/ec2metadata/ec2metadata.go#L137
+// return instance metadata collected through AWS IMDS
 func (c *awsmetadataCollector) getAwsMetadata() ([][3]int, error) {
 	metrics := [][3]int{}
 	eventsMetadata, err := c.getAwsScheduledEvents()
@@ -89,7 +111,7 @@ func (c *awsmetadataCollector) getAwsScheduledEvents() (string, error) {
 	return string(mdEvents), nil
 }
 
-// takes an array of json objects in string format and returns populated structs
+// takes an array of json objects as a string and returns populated structs
 func parseAwsScheduledEvents(data string) ([]scheduledEvent, error) {
 	res := []scheduledEvent{}
 	json.Unmarshal([]byte(data), &res)
