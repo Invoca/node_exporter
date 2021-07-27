@@ -12,55 +12,55 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var awsmetadataDesc = prometheus.NewDesc(
-	prometheus.BuildFQName(namespace, "awsmetadata", "info"),
-	"Labeled AWS instance metadata information provided by local http request.",
-	[]string{
-		"code",
-		"state",
-		"description",
-		"eventid",
-		"notbefore",
-		"notafter",
-	},
-	nil,
-)
-
 type scheduledEvent struct {
   Code         string  `json:"code"`
   State        string  `json:"state"`
   Description  string  `json:"description"`
-  EventId      string  `json:"eventid"`
+  EventID      string  `json:"eventid"`
   NotBefore    string  `json:"notbefore"`
   NotAfter     string  `json:"notafter"`
 }
 
 type awsmetadataCollector struct {
+	metric []typedDesc
 	logger log.Logger
 }
 
 func init() {
-	registerCollector("awsmetadata", defaultEnabled, newAwsmetdataCollector)
+	registerCollector("awsmetadata", defaultEnabled, NewAwsmetadataCollector)
 }
 
 // NewAwsmetadataCollector returns new Collector exposing AWS instance metadata stats
-func newAwsmetdataCollector(logger log.Logger) (Collector, error) {
-	return &unameCollector{logger}, nil
+func NewAwsmetadataCollector(logger log.Logger) (Collector, error) {
+	return &awsmetadataCollector{
+		metric: []typedDesc{
+			{prometheus.NewDesc(namespace+"_state", "state of scheduled event", []string{"code", "state",}, nil), prometheus.GaugeValue},
+			{prometheus.NewDesc(namespace+"_notbefore", "earliest start time of scheduled event", []string{"code", "state",}, nil), prometheus.GaugeValue},
+			{prometheus.NewDesc(namespace+"_notafter", "latest start time of scheduled event", []string{"code", "state",}, nil), prometheus.GaugeValue},
+		},
+		logger: logger,
+		}, nil
 }
 
 func (c *awsmetadataCollector) Update(ch chan<- prometheus.Metric) error {
-	metrics, err := c.getAwsMetadata()
+	metricSets, err := c.getAwsMetadata()
 	if err != nil {
 		return fmt.Errorf("couldn't get scheduled events from instance metadata: %w", err)
 	}
 
-	for i, metric := range metrics {
+	for i, metrics := range metricSets {
 		// TODO: start here -- need to setup metric Descs and push to channel
-		ch <- prometheus.MustNewConstMetric(awsmetadataDesc, prometheus.GaugeValue, 1,
-			metric[0],
-			metric[1],
-			metric[2],
-		)
+		for j, metric := range metrics {
+			if j == 0 {
+				level.Debug(c.logger).Log("msg", "return aws event", "index", i, "state", metric)
+			} else if j == 1 {
+				level.Debug(c.logger).Log("msg", "return aws event", "index", i, "notbefore", metric)
+			} else {
+				level.Debug(c.logger).Log("msg", "return aws event", "index", i, "notafter", metric)
+			}
+
+			ch <- c.metric[i].mustNewConstMetric(metric)
+		}
 	}
 
 	return nil
@@ -69,8 +69,8 @@ func (c *awsmetadataCollector) Update(ch chan<- prometheus.Metric) error {
 // TODO: should i generalize this more?
 // TODO: compare to https://github.com/aws/aws-node-termination-handler/blob/8eceda9337/pkg/ec2metadata/ec2metadata.go#L137
 // return instance metadata collected through AWS IMDS
-func (c *awsmetadataCollector) getAwsMetadata() ([][3]int, error) {
-	metrics := [][3]int{}
+func (c *awsmetadataCollector) getAwsMetadata() ([][3]float64, error) {
+	metrics := [][3]float64{}
 	eventsMetadata, err := c.getAwsScheduledEvents()
 	if err != nil {
 		return nil, err
@@ -120,8 +120,8 @@ func parseAwsScheduledEvents(data string) ([]scheduledEvent, error) {
 }
 
 // returns metrics in the order {active, notbefore, notafter}
-func parseAwsScheduledEventMetrics(event scheduledEvent) ([3]int, error) {
-	var metrics [3]int
+func parseAwsScheduledEventMetrics(event scheduledEvent) ([3]float64, error) {
+	var metrics [3]float64
 	tformat := "_2 Jan 2006 15:04:05 GMT"
 
 	if event.State == "active" {
@@ -132,15 +132,15 @@ func parseAwsScheduledEventMetrics(event scheduledEvent) ([3]int, error) {
 
 	nb, err := time.Parse(tformat, event.NotBefore)
 	if err != nil {
-		return [3]int{0, 0, 0}, err
+		return [3]float64{0, 0, 0}, err
 	}
 	na, err := time.Parse(tformat, event.NotAfter)
 	if err != nil {
-		return [3]int{0, 0, 0}, err
+		return [3]float64{0, 0, 0}, err
 	}
 
-	metrics[1] = int(nb.Unix())
-	metrics[2] = int(na.Unix())
+	metrics[1] = float64(nb.Unix())
+	metrics[2] = float64(na.Unix())
 
 	return metrics, nil
 }
